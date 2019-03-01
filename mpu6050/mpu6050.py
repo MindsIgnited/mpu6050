@@ -5,7 +5,7 @@ Released under the MIT License
 Copyright (c) 2015, 2016, 2017 MrTijn/Tijndagamer
 """
 
-import smbus
+import smbus2
 
 class mpu6050:
 
@@ -36,6 +36,12 @@ class mpu6050:
     GYRO_RANGE_1000DEG = 0x10
     GYRO_RANGE_2000DEG = 0x18
 
+    # Config Register definitions : Page 13 https://store.invensense.com/Datasheets/invensense/RM-MPU-6000A.pdf
+    CONFIG_EXT_SYNC_SET_BIT = 5
+    CONFIG_EXT_SYNC_SET_LENGTH = 3
+    CONFIG_DLPF_CFG_BIT = 2
+    CONFIG_DLPF_CFG_LENGTH = 3
+
     # MPU-6050 Registers
     PWR_MGMT_1 = 0x6B
     PWR_MGMT_2 = 0x6C
@@ -50,14 +56,17 @@ class mpu6050:
     GYRO_YOUT0 = 0x45
     GYRO_ZOUT0 = 0x47
 
+    CONFIG = 0x1A
     ACCEL_CONFIG = 0x1C
     GYRO_CONFIG = 0x1B
 
     def __init__(self, address, bus=1):
         self.address = address
-        self.bus = smbus.SMBus(bus)
+        self.bus = smbus2.SMBus(bus)
         # Wake up the MPU-6050 since it starts in sleep mode
-        self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x00)
+        # and set clock to PLL w/ x-axis gyro
+        # Page 41 https://store.invensense.com/Datasheets/invensense/RM-MPU-6000A.pdf
+        self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x01)
 
     # I2C communication methods
 
@@ -78,7 +87,149 @@ class mpu6050:
         else:
             return value
 
+    # Todo: move these to an extended smbus2 implementation
+    def read_bits(self, dev_addr, reg_addr, bit_start, length):
+        """ Read multiple bits from an 8-bit device register.
+
+        :param dev_addr: I2C slave device address
+        :param reg_addr: Register regAddr to read from
+        :param bit_start: First bit position to read (0-7)
+        :param length: length Number of bits to read (not more than 8)
+        :return: Read byte value
+        :rtype: int
+        """
+
+        raw_data = self.bus.read_byte_data(dev_addr, reg_addr)
+
+        mask = ((1 << length) - 1) << (bit_start - length + 1)
+        raw_data &= mask
+        raw_data >>= (bit_start - length + 1)
+        return raw_data
+
+    def write_bits(self, dev_addr, reg_addr, bit_start, length, data):
+        """ Write multiple bits in an 8-bit device register.
+
+        :param dev_addr: I2C slave device address
+        :param reg_addr: Register regAddr to write to
+        :param bit_start: First bit position to write (0-7)
+        :param length: Number of bits to write (not more than 8)
+        :param data: Right-aligned value to write
+        """
+        # 010 value to write
+        # 76543210 bit numbers
+        # xxx args: bitStart = 4, length = 3
+        # 00011100 mask byte
+        # 10101111 original value(sample)
+        # 10100011 original & ~mask
+        # 10101011 masked | value
+
+        # get current value of register
+        raw_data = self.bus.read_byte_data(dev_addr, reg_addr)
+
+        mask = ((1 << length) - 1) << (bit_start - length + 1)
+        data <<= (bit_start - length + 1)  # shift data into correct position
+        data &= mask  # zero all non-important bits in data
+        raw_data &= ~mask  # zero all important bits in existing byte
+        raw_data |= data  # combine data with existing byte
+        self.bus.write_byte_data(dev_addr, reg_addr, raw_data)
+
     # MPU-6050 Methods
+
+    def get_external_frame_sync(self):
+        """ Get external FSYNC configuration.
+
+          Configures the external Frame Synchronization (FSYNC) pin sampling. An
+          external signal connected to the FSYNC pin can be sampled by configuring
+          EXT_SYNC_SET. Signal changes to the FSYNC pin are latched so that short
+          strobes may be captured. The latched FSYNC signal will be sampled at the
+          Sampling Rate, as defined in register 25. After sampling, the latch will
+          reset to the current FSYNC signal state.
+
+          The sampled value will be reported in place of the least significant bit in
+          a sensor data register determined by the value of EXT_SYNC_SET according to
+          the following table.
+
+          <pre>
+          EXT_SYNC_SET | FSYNC Bit Location
+          -------------+-------------------
+          0            | Input disabled
+          1            | TEMP_OUT_L[0]
+          2            | GYRO_XOUT_L[0]
+          3            | GYRO_YOUT_L[0]
+          4            | GYRO_ZOUT_L[0]
+          5            | ACCEL_XOUT_L[0]
+          6            | ACCEL_YOUT_L[0]
+          7            | ACCEL_ZOUT_L[0]
+          </pre>
+        :return: FSYNC configuration value
+        """
+        return self.read_bits(self.address, self.CONFIG, self.CONFIG_EXT_SYNC_SET_BIT, self.CONFIG_EXT_SYNC_SET_LENGTH)
+
+    def set_external_frame_sync(self, sync):
+        """ Set external FSYNC configuration.
+        
+          EXT_SYNC_SET | FSYNC Bit Location
+          -------------+-------------------
+          0            | Input disabled
+          1            | TEMP_OUT_L[0]
+          2            | GYRO_XOUT_L[0]
+          3            | GYRO_YOUT_L[0]
+          4            | GYRO_ZOUT_L[0]
+          5            | ACCEL_XOUT_L[0]
+          6            | ACCEL_YOUT_L[0]
+          7            | ACCEL_ZOUT_L[0]
+
+        :param sync: value to set for sync (0-7)
+        """
+        self.write_bits(self.address, self.CONFIG, self.CONFIG_EXT_SYNC_SET_BIT, self.CONFIG_EXT_SYNC_SET_LENGTH, sync)
+
+    def get_dlpf_mode(self):
+        """  Get digital low-pass filter configuration.
+
+          The DLPF_CFG parameter sets the digital low pass filter configuration. It
+          also determines the internal sampling rate used by the device as shown in
+          the table below.
+
+          Note: The accelerometer output rate is 1kHz. This means that for a Sample
+          Rate greater than 1kHz, the same accelerometer sample may be output to the
+          FIFO, DMP, and sensor registers more than once.
+
+          <pre>
+                   |   ACCELEROMETER    |           GYROSCOPE
+          DLPF_CFG | Bandwidth | Delay  | Bandwidth | Delay  | Sample Rate
+          ---------+-----------+--------+-----------+--------+-------------
+          0        | 260Hz     | 0ms    | 256Hz     | 0.98ms | 8kHz
+          1        | 184Hz     | 2.0ms  | 188Hz     | 1.9ms  | 1kHz
+          2        | 94Hz      | 3.0ms  | 98Hz      | 2.8ms  | 1kHz
+          3        | 44Hz      | 4.9ms  | 42Hz      | 4.8ms  | 1kHz
+          4        | 21Hz      | 8.5ms  | 20Hz      | 8.3ms  | 1kHz
+          5        | 10Hz      | 13.8ms | 10Hz      | 13.4ms | 1kHz
+          6        | 5Hz       | 19.0ms | 5Hz       | 18.6ms | 1kHz
+          7        |   -- Reserved --   |   -- Reserved --   | Reserved
+          </pre>
+        :return: DLFP configuration
+        """
+        return self.read_bits(self.address, self.CONFIG, self.CONFIG_DLPF_CFG_BIT, self.CONFIG_DLPF_CFG_LENGTH)
+
+    def set_dlpf_mode(self, mode):
+        """ Set digital low-pass filter configuration.
+
+                   |   ACCELEROMETER    |           GYROSCOPE
+          DLPF_CFG | Bandwidth | Delay  | Bandwidth | Delay  | Sample Rate
+          ---------+-----------+--------+-----------+--------+-------------
+          0        | 260Hz     | 0ms    | 256Hz     | 0.98ms | 8kHz
+          1        | 184Hz     | 2.0ms  | 188Hz     | 1.9ms  | 1kHz
+          2        | 94Hz      | 3.0ms  | 98Hz      | 2.8ms  | 1kHz
+          3        | 44Hz      | 4.9ms  | 42Hz      | 4.8ms  | 1kHz
+          4        | 21Hz      | 8.5ms  | 20Hz      | 8.3ms  | 1kHz
+          5        | 10Hz      | 13.8ms | 10Hz      | 13.4ms | 1kHz
+          6        | 5Hz       | 19.0ms | 5Hz       | 18.6ms | 1kHz
+          7        |   -- Reserved --   |   -- Reserved --   | Reserved
+
+        :param mode: value to set for dlpf mode (0-6)
+        :return:
+        """
+        self.write_bits(self.address, self.CONFIG, self.CONFIG_DLPF_CFG_BIT, self.CONFIG_DLPF_CFG_LENGTH, mode)
 
     def get_temp(self):
         """Reads the temperature from the onboard temperature sensor of the MPU-6050.
