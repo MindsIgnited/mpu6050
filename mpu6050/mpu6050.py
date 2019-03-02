@@ -69,8 +69,9 @@ class mpu6050:
         self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x01)
 
     # I2C communication methods
+    # Todo: move these to an extended smbus2 implementation
 
-    def read_i2c_word(self, register):
+    def read_i2c_word_data(self, register):
         """Read two i2c registers and combine them.
 
         register -- the first register to read from.
@@ -87,7 +88,6 @@ class mpu6050:
         else:
             return value
 
-    # Todo: move these to an extended smbus2 implementation
     def read_bits(self, dev_addr, reg_addr, bit_start, length):
         """ Read multiple bits from an 8-bit device register.
 
@@ -236,7 +236,7 @@ class mpu6050:
 
         Returns the temperature in degrees Celcius.
         """
-        raw_temp = self.read_i2c_word(self.TEMP_OUT0)
+        raw_temp = self.read_i2c_word_data(self.TEMP_OUT0)
 
         # Get the actual temperature using the formule given in the
         # MPU-6050 Register Map and Descriptions revision 4.2, page 30
@@ -287,9 +287,9 @@ class mpu6050:
         If g is False, it will return the data in m/s^2
         Returns a dictionary with the measurement results.
         """
-        x = self.read_i2c_word(self.ACCEL_XOUT0)
-        y = self.read_i2c_word(self.ACCEL_YOUT0)
-        z = self.read_i2c_word(self.ACCEL_ZOUT0)
+        x = self.read_i2c_word_data(self.ACCEL_XOUT0)
+        y = self.read_i2c_word_data(self.ACCEL_YOUT0)
+        z = self.read_i2c_word_data(self.ACCEL_ZOUT0)
 
         accel_scale_modifier = None
         accel_range = self.read_accel_range(True)
@@ -359,9 +359,9 @@ class mpu6050:
 
         Returns the read values in a dictionary.
         """
-        x = self.read_i2c_word(self.GYRO_XOUT0)
-        y = self.read_i2c_word(self.GYRO_YOUT0)
-        z = self.read_i2c_word(self.GYRO_ZOUT0)
+        x = self.read_i2c_word_data(self.GYRO_XOUT0)
+        y = self.read_i2c_word_data(self.GYRO_YOUT0)
+        z = self.read_i2c_word_data(self.GYRO_ZOUT0)
 
         gyro_scale_modifier = None
         gyro_range = self.read_gyro_range(True)
@@ -391,6 +391,7 @@ class mpu6050:
         gyro = self.get_gyro_data()
 
         return [accel, gyro, temp]
+
 
 if __name__ == "__main__":
     mpu = mpu6050(0x68)
