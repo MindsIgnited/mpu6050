@@ -68,6 +68,10 @@ class mpu6050:
         # Page 41 https://store.invensense.com/Datasheets/invensense/RM-MPU-6000A.pdf
         self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x01)
 
+    # Deleting (Calling destructor)
+    def __del__(self):
+        self.bus.close()
+
     # I2C communication methods
     # Todo: move these to an extended smbus2 implementation
 
