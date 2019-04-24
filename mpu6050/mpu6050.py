@@ -68,11 +68,11 @@ class mpu6050:
         # Page 41 https://store.invensense.com/Datasheets/invensense/RM-MPU-6000A.pdf
         self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x01)
 
-    	# // Configure Gyro and Accelerometer
+        # // Configure Gyro and Accelerometer
         # // Disable FSYNC and set accelerometer and gyro bandwidth to 44 and 42 Hz, respectively;
         # // DLPF_CFG = bits 2:0 = 010; this sets the sample rate at 1 kHz for both
-    	self.bus.write_byte_data(self.address, self.CONFIG, 0x03);  # configuration
-    	self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x08);
+        self.bus.write_byte_data(self.address, self.CONFIG, 0x03)  # configuration
+        self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x08)
 
     # Deleting (Calling destructor)
     def __del__(self):
