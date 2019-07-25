@@ -7,7 +7,6 @@ Copyright (c) 2015, 2016, 2017 MrTijn/Tijndagamer
 
 import smbus2
 import time
-import random
 
 
 class mpu6050:
@@ -112,7 +111,7 @@ class mpu6050:
                 if tries > 4:
                     raise
                 else:
-                    time.sleep(random.randint(300, 501) * .001)  # random to try and avoid contention
+                    time.sleep(.350)  # random to try and avoid contention
 
     def read_bits(self, dev_addr, reg_addr, bit_start, length):
         """ Read multiple bits from an 8-bit device register.
