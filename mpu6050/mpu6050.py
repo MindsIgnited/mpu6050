@@ -6,6 +6,7 @@ Copyright (c) 2015, 2016, 2017 MrTijn/Tijndagamer
 """
 
 import smbus2
+import time
 
 class mpu6050:
 
@@ -72,7 +73,9 @@ class mpu6050:
         # // Disable FSYNC and set accelerometer and gyro bandwidth to 44 and 42 Hz, respectively;
         # // DLPF_CFG = bits 2:0 = 010; this sets the sample rate at 1 kHz for both
         self.bus.write_byte_data(self.address, self.CONFIG, 0x03)  # configuration
-        self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x08)
+
+        self.set_accel_range(self.ACCEL_RANGE_4G)
+        self.set_gyro_range(self.GYRO_RANGE_250DEG)
 
     # Deleting (Calling destructor)
     def __del__(self):
@@ -82,21 +85,33 @@ class mpu6050:
     # Todo: move these to an extended smbus2 implementation
 
     def read_i2c_word_data(self, register):
-        """Read two i2c registers and combine them.
+        tries = 0
+        while True:
+            try:
 
-        register -- the first register to read from.
-        Returns the combined read results.
-        """
-        # Read the data from the registers
-        high = self.bus.read_byte_data(self.address, register)
-        low = self.bus.read_byte_data(self.address, register + 1)
+                tries = tries + 1
 
-        value = (high << 8) + low
+                """Read two i2c registers and combine them.
+                
+                        register -- the first register to read from.
+                        Returns the combined read results.
+                        """
+                # Read the data from the registers
+                high = self.bus.read_byte_data(self.address, register)
+                low = self.bus.read_byte_data(self.address, register + 1)
 
-        if value >= 0x8000:
-            return -((65535 - value) + 1)
-        else:
-            return value
+                value = (high << 8) + low
+
+                if value >= 0x8000:
+                    return -((65535 - value) + 1)
+                else:
+                    return value
+
+            except IOError:
+                if tries > 3:
+                    raise
+                else:
+                    time.sleep(.250)
 
     def read_bits(self, dev_addr, reg_addr, bit_start, length):
         """ Read multiple bits from an 8-bit device register.
