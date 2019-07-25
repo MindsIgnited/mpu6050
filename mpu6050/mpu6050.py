@@ -385,7 +385,7 @@ class mpu6050:
         elif gyro_range == self.GYRO_RANGE_2000DEG:
             gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_2000DEG
         else:
-            print("Unkown range - gyro_scale_modifier set to self.GYRO_SCALE_MODIFIER_250DEG")
+            print("Unkown range! {} - gyro_scale_modifier set to self.GYRO_SCALE_MODIFIER_250DEG".format(gyro_range))
             gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_250DEG
 
         x = x / gyro_scale_modifier
