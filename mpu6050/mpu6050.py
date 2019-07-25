@@ -88,14 +88,13 @@ class mpu6050:
         tries = 0
         while True:
             try:
-
                 tries = tries + 1
 
                 """Read two i2c registers and combine them.
                 
-                        register -- the first register to read from.
-                        Returns the combined read results.
-                        """
+                register -- the first register to read from.
+                Returns the combined read results.
+                """
                 # Read the data from the registers
                 high = self.bus.read_byte_data(self.address, register)
                 low = self.bus.read_byte_data(self.address, register + 1)
