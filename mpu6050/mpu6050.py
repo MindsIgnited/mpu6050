@@ -313,7 +313,7 @@ class mpu6050:
         elif accel_range == self.ACCEL_RANGE_16G:
             accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_16G
         else:
-            print("Unkown range {} - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G".format(accel_scale_modifier))
+            print("Unkown range! {} - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G".format(accel_range))
             accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
 
         x = x / accel_scale_modifier
