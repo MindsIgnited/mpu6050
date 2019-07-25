@@ -108,7 +108,7 @@ class mpu6050:
                     return value
 
             except IOError:
-                if tries > 3:
+                if tries > 4:
                     raise
                 else:
                     time.sleep(.250)
